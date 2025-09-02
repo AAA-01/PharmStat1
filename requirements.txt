@@ -1,0 +1,10 @@
+streamlit
+pandas
+numpy
+matplotlib
+openpyxl
+sixsigmaspc
+seaborn
+scipy==1.15.3
+statsmodels
+ruptures
