@@ -8,36 +8,53 @@ import os
 
 __all__ = ["show"]
 
-# Широкий макет для удобства и печати
+# Широкий макет
 st.set_page_config(layout="wide")
 
-# Глобальные стили (аккуратные для печати)
+# Печать: альбомная ориентация + не рвать блоки + компактные таблицы при печати
 _PRINT_CSS = """
 <style>
-/* Общая читаемость */
-html, body, [class^="css"]  { line-height: 1.35; }
-
-/* Подзаголовки и разделители */
+/* экран — как было */
+html, body, [class^="css"] { line-height: 1.35; }
 h2, h3 { margin-top: 0.4rem; margin-bottom: 0.6rem; }
-
-/* Карточки сообщений (success/info/warn) — чуть компактнее */
 .stAlert { padding: 0.6rem 0.8rem; }
 
-/* Печатные правила */
 @media print {
-  header, footer, .stFileUploader, .stToolbar, .st-emotion-cache-6qob1r, .st-emotion-cache-1avcm0n { display: none !important; }
+  /* A4 ландшафт + поля */
+  @page { size: A4 landscape; margin: 12mm; }
+
+  /* скрыть хром UI */
+  header, footer, .stFileUploader, .stToolbar { display:none !important; }
   .block-container { padding-top: 0 !important; }
-  .stDataFrame { overflow: visible !important; }
-  .stPlotlyChart, .stPyplot, .stAltairChart { page-break-inside: avoid; }
+
+  /* 1) Развернуть ВСЕ колонки в одну вертикаль */
+  [data-testid="stHorizontalBlock"] { display:block !important; }
+  [data-testid="column"] { width:100% !important; display:block !important; }
+
+  /* 2) Не рвать основные контейнеры */
+  .report-block { break-inside: avoid !important; page-break-inside: avoid !important; }
+
+  /* 3) Не рвать таблицы и их строки */
+  [data-testid="stTable"] table, 
+  [data-testid="stDataFrame"] table { break-inside: avoid !important; page-break-inside: avoid !important; }
+  [data-testid="stTable"] tr, 
+  [data-testid="stDataFrame"] tr { break-inside: avoid !important; page-break-inside: avoid !important; }
+
+  /* 4) Сделать таблицы компактнее, разрешить перенос в ячейках */
+  .stDataFrame, .stTable { overflow: visible !important; }
+  .stDataFrame table, .stTable table { font-size: 11px !important; }
+  .stDataFrame th, .stDataFrame td, 
+  .stTable th, .stTable td { white-space: normal !important; word-break: break-word !important; }
+
+  /* 5) Графики и заголовки не рвать */
+  .stPyplot, .stAltairChart, .stPlotlyChart { break-inside: avoid !important; page-break-inside: avoid !important; }
   h1, h2, h3 { page-break-after: avoid; }
-  .page-break { page-break-before: always; }
-  .report-block { page-break-inside: avoid; }
 }
 </style>
 """
 st.markdown(_PRINT_CSS, unsafe_allow_html=True)
 
-# Добавляем путь к корню проекта (если модуль запускается как часть пакета)
+# Путь к корню проекта
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def show(language=None):
@@ -49,35 +66,30 @@ def show(language=None):
 
     df = pd.read_excel(uploaded_file)
 
-    # ===== Исходные данные (во всю ширину, содержимое по центру) =====
+    # ===== Исходные данные (вся таблица, без скролла) =====
     st.markdown('<div class="report-block">', unsafe_allow_html=True)
     st.subheader("Исходные данные")
 
-    styled_df = (
-        df.style
-        .set_properties(**{"text-align": "center"})
-        .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}])
-    )
-    st.table(styled_df)
-    st.markdown("</div>", unsafe_allow_html=True)
+    # показываем полностью, без скролла
+    st.table(df.reset_index(drop=True).round(2))  
 
+    st.markdown("</div>", unsafe_allow_html=True)
     st.markdown("---")
 
-    # Подготовка групп для анализа
+    # Группы для анализа
     groups = [df[col].dropna().tolist() for col in df.columns]
 
-    # Тип выборок
+    # Параметры анализа
     sample_type = st.selectbox(
         "Выберите тип выборок:",
         ["Независимые (по умолчанию)", "Зависимые (парные)"],
     )
     paired = (sample_type == "Зависимые (парные)")
 
-    # Уровень значимости
     alpha = st.selectbox(
         "Выберите уровень значимости (alpha):",
         [0.01, 0.025, 0.05, 0.1],
-        index=2,  # по умолчанию 0.05
+        index=2,
     )
 
     try:
@@ -95,7 +107,7 @@ def show(language=None):
         with c2:
             st.write(f"Размер выборок (строк): {len(df)}")
 
-        # Таблица показателей (входит в Обзор данных) — по ширине, ячейки по центру
+        # Таблица показателей (центр, без индекса, 2 знака)
         st.markdown("**Таблица статистических показателей по группам**")
         rows = []
         for i, summary in enumerate(result["group_summary"], start=1):
@@ -112,13 +124,15 @@ def show(language=None):
 
         styled_full_df = (
             full_df.style
+            .hide(axis="index")
             .set_properties(**{"text-align": "center"})
             .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}])
+            .format(precision=2)
         )
-        st.table(styled_full_df)
+        st.dataframe(styled_full_df, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-        # ===== Визуализация (всегда, в одну строку 2 графика) =====
+        # ===== Визуализация =====
         st.markdown('<div class="report-block">', unsafe_allow_html=True)
         st.subheader("Визуализация")
         vcol1, vcol2 = st.columns(2)
@@ -127,7 +141,7 @@ def show(language=None):
             st.markdown("**Boxplot**")
             fig1, ax1 = plt.subplots()
             df.boxplot(ax=ax1)
-            ax1.set_xlabel("")  # чище при печати
+            ax1.set_xlabel("")
             ax1.set_ylabel("")
             st.pyplot(fig1, use_container_width=True)
 
@@ -204,7 +218,6 @@ def show(language=None):
         with c2:
             st.info(f"**Значение статистики:** {result['statistic']:.4f}  \n**p-value:** {result['p_value']:.4f}")
 
-        # Краткий вывод (перенос p для печати)
         st.markdown("**Краткий вывод о статистических различиях:**")
         if result["p_value"] < alpha:
             st.success(
@@ -226,7 +239,6 @@ def show(language=None):
                 "  - **Манна–Уитни / Уилкоксона (непараметрический)**: сравнивает распределения/медианы при нарушении нормальности.\n"
                 "  - **ANOVA**: проверяет различия между более чем двумя средними.\n"
                 "  - **Краскела–Уоллиса**: непараметрический аналог ANOVA для ненормальных выборок.\n"
-                "- **Практический вывод:** результат теста не равен «величине эффекта»; смотрите также на средние/медианы и графики распределений."
             )
         st.markdown("</div>", unsafe_allow_html=True)
 
