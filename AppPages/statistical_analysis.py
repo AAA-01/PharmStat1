@@ -23,7 +23,7 @@ h2, h3 { margin-top: 0.4rem; margin-bottom: 0.6rem; }
 /* Карточки сообщений (success/info/warn) — чуть компактнее */
 .stAlert { padding: 0.6rem 0.8rem; }
 
-/* Таблицы компактнее и без горизонтальной прокрутки при печати */
+/* Печатные правила */
 @media print {
   header, footer, .stFileUploader, .stToolbar, .st-emotion-cache-6qob1r, .st-emotion-cache-1avcm0n { display: none !important; }
   .block-container { padding-top: 0 !important; }
@@ -31,6 +31,7 @@ h2, h3 { margin-top: 0.4rem; margin-bottom: 0.6rem; }
   .stPlotlyChart, .stPyplot, .stAltairChart { page-break-inside: avoid; }
   h1, h2, h3 { page-break-after: avoid; }
   .page-break { page-break-before: always; }
+  .report-block { page-break-inside: avoid; }
 }
 </style>
 """
@@ -48,13 +49,17 @@ def show(language=None):
 
     df = pd.read_excel(uploaded_file)
 
-    # ===== Исходные данные (вся таблица без скролла) =====
+    # ===== Исходные данные (во всю ширину, содержимое по центру) =====
+    st.markdown('<div class="report-block">', unsafe_allow_html=True)
     st.subheader("Исходные данные")
-    # Подбираем высоту под все строки (примерная высота строки ~28 px + заголовок ~42 px)
-    row_h = 28
-    header_h = 42
-    df_height = header_h + max(1, len(df)) * row_h
-    st.dataframe(df, use_container_width=True, height=df_height)
+
+    styled_df = (
+        df.style
+        .set_properties(**{"text-align": "center"})
+        .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}])
+    )
+    st.table(styled_df)
+    st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("---")
 
@@ -81,6 +86,7 @@ def show(language=None):
         # =========================
         # 1) Обзор данных
         # =========================
+        st.markdown('<div class="report-block">', unsafe_allow_html=True)
         st.subheader("1) Обзор данных")
 
         c1, c2 = st.columns(2)
@@ -89,9 +95,8 @@ def show(language=None):
         with c2:
             st.write(f"Размер выборок (строк): {len(df)}")
 
-        # Таблица показателей (входит в Обзор данных)
+        # Таблица показателей (входит в Обзор данных) — по ширине, ячейки по центру
         st.markdown("**Таблица статистических показателей по группам**")
-
         rows = []
         for i, summary in enumerate(result["group_summary"], start=1):
             rows.append({
@@ -104,9 +109,17 @@ def show(language=None):
                 "Дисперсия": summary.get("var"),
             })
         full_df = pd.DataFrame(rows)
-        st.dataframe(full_df, use_container_width=True)
+
+        styled_full_df = (
+            full_df.style
+            .set_properties(**{"text-align": "center"})
+            .set_table_styles([{"selector": "th", "props": [("text-align", "center")]}])
+        )
+        st.table(styled_full_df)
+        st.markdown("</div>", unsafe_allow_html=True)
 
         # ===== Визуализация (всегда, в одну строку 2 графика) =====
+        st.markdown('<div class="report-block">', unsafe_allow_html=True)
         st.subheader("Визуализация")
         vcol1, vcol2 = st.columns(2)
 
@@ -127,12 +140,14 @@ def show(language=None):
             ax2.set_xlabel("")
             ax2.set_ylabel("")
             st.pyplot(fig2, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("---")
 
         # =========================
         # 2) Проверка на нормальность
         # =========================
+        st.markdown('<div class="report-block">', unsafe_allow_html=True)
         st.subheader("2) Проверка на нормальность")
 
         # 2a. Шапиро–Уилка
@@ -140,7 +155,6 @@ def show(language=None):
         cols = st.columns(4)
 
         for i, (p_value, col_name) in enumerate(zip(result["shapiro_p"], df.columns), start=1):
-            # Первая строка — вердикт; вторая строка — p и сравнение (новая строка для читаемости)
             verdict = "нормальная" if p_value > alpha else "не-нормальная"
             box_text = (
                 f"Группа {i} ({col_name}): {verdict}  \n"
@@ -168,15 +182,20 @@ def show(language=None):
             else:
                 st.warning(lev_text_bad)
 
-        st.markdown(
-                "Помощь в интерпретации результатов"
+        with st.expander("Помощь в интерпретации результатов"):
+            st.write(
                 "- **Шапиро–Уилка**: p > α → распределение близко к нормальному; p ≤ α → отклонение от нормальности.\n"
                 "- **Левен**: p > α → дисперсии однородны; p ≤ α → дисперсии неоднородны.\n"
                 "- Выбор параметрического/непараметрического теста и учёт однородности дисперсий зависят от этих проверок."
             )
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown("---")
+
         # =========================
         # 3) Выбранный статистический метод и итог
         # =========================
+        st.markdown('<div class="report-block">', unsafe_allow_html=True)
         st.subheader("3) Выбранный статистический метод и итог")
 
         c1, c2 = st.columns(2)
@@ -198,7 +217,18 @@ def show(language=None):
                 f"(p = {result['p_value']:.4f} ≥ α={alpha})."
             )
 
-       
+        with st.expander("Помощь в интерпретации выбранного метода"):
+            st.write(
+                "- **Если p-value < α** → различия **статистически значимы** (H₀ отвергается).\n"
+                "- **Если p-value ≥ α** → статистически значимых различий **не выявлено** (оснований отвергать H₀ нет).\n"
+                "- **Что означает тест:**\n"
+                "  - **t-тест (параметрический)**: сравнивает средние при нормальности и равенстве дисперсий.\n"
+                "  - **Манна–Уитни / Уилкоксона (непараметрический)**: сравнивает распределения/медианы при нарушении нормальности.\n"
+                "  - **ANOVA**: проверяет различия между более чем двумя средними.\n"
+                "  - **Краскела–Уоллиса**: непараметрический аналог ANOVA для ненормальных выборок.\n"
+                "- **Практический вывод:** результат теста не равен «величине эффекта»; смотрите также на средние/медианы и графики распределений."
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
 
     except ValueError as e:
         st.error(str(e))
