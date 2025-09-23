@@ -1,52 +1,29 @@
+# AppPages/statistical_analysis.py
 from STATANALYZE.analyzer import analyze_groups
+from utils.statistical_analysis_translation import statistical_analysis_translations
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import sys
-import os
 
 __all__ = ["show"]
 
-# Широкий макет
-st.set_page_config(layout="wide")
-
-# Печать: альбомная ориентация + не рвать блоки + компактные таблицы при печати
 _PRINT_CSS = """
 <style>
-/* экран — как было */
 html, body, [class^="css"] { line-height: 1.35; }
 h2, h3 { margin-top: 0.4rem; margin-bottom: 0.6rem; }
 .stAlert { padding: 0.6rem 0.8rem; }
-
 @media print {
-  /* A4 ландшафт + поля */
   @page { size: A4 landscape; margin: 12mm; }
-
-  /* скрыть хром UI */
   header, footer, .stFileUploader, .stToolbar { display:none !important; }
   .block-container { padding-top: 0 !important; }
-
-  /* 1) Развернуть ВСЕ колонки в одну вертикаль */
   [data-testid="stHorizontalBlock"] { display:block !important; }
   [data-testid="column"] { width:100% !important; display:block !important; }
-
-  /* 2) Не рвать основные контейнеры */
   .report-block { break-inside: avoid !important; page-break-inside: avoid !important; }
-
-  /* 3) Не рвать таблицы и их строки */
-  [data-testid="stTable"] table, 
-  [data-testid="stDataFrame"] table { break-inside: avoid !important; page-break-inside: avoid !important; }
-  [data-testid="stTable"] tr, 
-  [data-testid="stDataFrame"] tr { break-inside: avoid !important; page-break-inside: avoid !important; }
-
-  /* 4) Сделать таблицы компактнее, разрешить перенос в ячейках */
+  [data-testid="stTable"] table, [data-testid="stDataFrame"] table { break-inside: avoid !important; page-break-inside: avoid !important; }
+  [data-testid="stTable"] tr,     [data-testid="stDataFrame"] tr     { break-inside: avoid !important; page-break-inside: avoid !important; }
   .stDataFrame, .stTable { overflow: visible !important; }
   .stDataFrame table, .stTable table { font-size: 11px !important; }
-  .stDataFrame th, .stDataFrame td, 
-  .stTable th, .stTable td { white-space: normal !important; word-break: break-word !important; }
-
-  /* 5) Графики и заголовки не рвать */
   .stPyplot, .stAltairChart, .stPlotlyChart { break-inside: avoid !important; page-break-inside: avoid !important; }
   h1, h2, h3 { page-break-after: avoid; }
 }
@@ -54,40 +31,37 @@ h2, h3 { margin-top: 0.4rem; margin-bottom: 0.6rem; }
 """
 st.markdown(_PRINT_CSS, unsafe_allow_html=True)
 
-# Путь к корню проекта
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+def show(language: str):
+    t = statistical_analysis_translations[language]["statistical_analysis"]
 
-def show(language=None):
-    st.title("Инструмент статистического анализа")
+    st.title(t["title"])
 
-    uploaded_file = st.file_uploader("Загрузите Excel-файл", type=["xlsx", "xls"])
+    uploaded_file = st.file_uploader(t["upload_label"], type=["xlsx", "xls"])
     if not uploaded_file:
         return
 
     df = pd.read_excel(uploaded_file)
 
-    # ===== Исходные данные (вся таблица, без скролла) =====
+    # ===== Dane źródłowe / Source data / Исходные данные =====
     st.markdown('<div class="report-block">', unsafe_allow_html=True)
-    st.subheader("Исходные данные")
-
-    # показываем полностью, без скролла
-    st.table(df.reset_index(drop=True).round(2))  
-
+    st.subheader(t["source_data"])
+    st.table(df.reset_index(drop=True).round(2))
     st.markdown("</div>", unsafe_allow_html=True)
+
     st.markdown("---")
 
-    # Группы для анализа
+    # Przygotowanie grup
     groups = [df[col].dropna().tolist() for col in df.columns]
 
-    # Параметры анализа
+    # Parametry
     sample_type = st.selectbox(
-        "Выберите тип выборок:",
-        ["Независимые (по умолчанию)", "Зависимые (парные)"],
+        t["sample_type_label"],
+        [t["sample_ind"], t["sample_dep"]],
     )
-    paired = (sample_type == "Зависимые (парные)")
+    paired = (sample_type == t["sample_dep"])
 
     alpha = st.selectbox(
-        "Выберите уровень значимости (alpha):",
+        t["alpha_label"],
         [0.01, 0.025, 0.05, 0.1],
         index=2,
     )
@@ -95,33 +69,29 @@ def show(language=None):
     try:
         result = analyze_groups(groups, paired=paired, alpha=alpha)
 
-        # =========================
-        # 1) Обзор данных
-        # =========================
+        # ===== 1) Przegląd danych / Data overview / Обзор данных =====
         st.markdown('<div class="report-block">', unsafe_allow_html=True)
-        st.subheader("1) Обзор данных")
+        st.subheader(t["sec1"])
 
         c1, c2 = st.columns(2)
         with c1:
-            st.write(f"Количество групп: {len(df.columns)}")
+            st.write(t["groups_count"].format(n=len(df.columns)))
         with c2:
-            st.write(f"Размер выборок (строк): {len(df)}")
+            st.write(t["rows_count"].format(n=len(df)))
 
-        # Таблица показателей (центр, без индекса, 2 знака)
-        st.markdown("**Таблица статистических показателей по группам**")
+        st.markdown("**" + t["group_stats_title"] + "**")
         rows = []
         for i, summary in enumerate(result["group_summary"], start=1):
             rows.append({
-                "Группа": f"{i}: {df.columns[i-1]}",
-                "n": summary.get("n"),
-                "Среднее": summary.get("mean"),
-                "Медиана": summary.get("median"),
-                "Стандартное отклонение": summary.get("std"),
-                "Межквартильный размах (IQR)": summary.get("iqr"),
-                "Дисперсия": summary.get("var"),
+                statistical_analysis_translations[language]["statistical_analysis"]["group_col"] if "group_col" in statistical_analysis_translations[language]["statistical_analysis"] else "Group": f"{i}: {df.columns[i-1]}",
+                statistical_analysis_translations[language]["statistical_analysis"]["n_col"]     if "n_col"     in statistical_analysis_translations[language]["statistical_analysis"] else "n": summary.get("n"),
+                statistical_analysis_translations[language]["statistical_analysis"]["mean_col"]  if "mean_col"  in statistical_analysis_translations[language]["statistical_analysis"] else "Mean": summary.get("mean"),
+                statistical_analysis_translations[language]["statistical_analysis"]["median_col"]if "median_col"in statistical_analysis_translations[language]["statistical_analysis"] else "Median": summary.get("median"),
+                statistical_analysis_translations[language]["statistical_analysis"]["std_col"]   if "std_col"   in statistical_analysis_translations[language]["statistical_analysis"] else "Std. deviation": summary.get("std"),
+                statistical_analysis_translations[language]["statistical_analysis"]["iqr_col"]   if "iqr_col"   in statistical_analysis_translations[language]["statistical_analysis"] else "IQR": summary.get("iqr"),
+                statistical_analysis_translations[language]["statistical_analysis"]["var_col"]   if "var_col"   in statistical_analysis_translations[language]["statistical_analysis"] else "Variance": summary.get("var"),
             })
         full_df = pd.DataFrame(rows)
-
         styled_full_df = (
             full_df.style
             .hide(axis="index")
@@ -132,115 +102,86 @@ def show(language=None):
         st.dataframe(styled_full_df, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-        # ===== Визуализация =====
+        # ===== Wizualizacja / Visualization / Визуализация =====
         st.markdown('<div class="report-block">', unsafe_allow_html=True)
-        st.subheader("Визуализация")
+        st.subheader(t["viz"])
         vcol1, vcol2 = st.columns(2)
 
         with vcol1:
-            st.markdown("**Boxplot**")
+            st.markdown("**" + t["boxplot"] + "**")
             fig1, ax1 = plt.subplots()
             df.boxplot(ax=ax1)
-            ax1.set_xlabel("")
-            ax1.set_ylabel("")
+            ax1.set_xlabel(""); ax1.set_ylabel("")
             st.pyplot(fig1, use_container_width=True)
 
         with vcol2:
-            st.markdown("**Плотности (KDE)**")
+            st.markdown("**" + t["kde"] + "**")
             fig2, ax2 = plt.subplots()
             for col in df.columns:
                 sns.kdeplot(df[col].dropna(), label=col, fill=True, ax=ax2)
-            ax2.legend(title="Группы", loc="best")
-            ax2.set_xlabel("")
-            ax2.set_ylabel("")
+            # Tytuł legendy / Legend title / Заголовок легенды
+            legend_title = statistical_analysis_translations[language]["statistical_analysis"].get("group_col", "Group")
+            ax2.legend(title=legend_title, loc="best")
+            ax2.set_xlabel(""); ax2.set_ylabel("")
             st.pyplot(fig2, use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("---")
 
-        # =========================
-        # 2) Проверка на нормальность
-        # =========================
+        # ===== 2) Normalność / Normality / Нормальность =====
+        t_sa = statistical_analysis_translations[language]["statistical_analysis"]
         st.markdown('<div class="report-block">', unsafe_allow_html=True)
-        st.subheader("2) Проверка на нормальность")
+        st.subheader(t_sa["sec2"])
 
-        # 2a. Шапиро–Уилка
-        st.markdown("**a. Тест Шапиро–Уилка**")
+        st.markdown("**" + t_sa["sw_title"] + "**")
         cols = st.columns(4)
-
         for i, (p_value, col_name) in enumerate(zip(result["shapiro_p"], df.columns), start=1):
-            verdict = "нормальная" if p_value > alpha else "не-нормальная"
-            box_text = (
-                f"Группа {i} ({col_name}): {verdict}  \n"
-                f"(p = {p_value:.4f} {'>' if p_value > alpha else '≤'} α={alpha})"
-            )
-            with cols[(i-1) % 4]:
-                if p_value > alpha:
-                    st.success(box_text)
-                else:
-                    st.error(box_text)
+            is_normal = p_value > alpha
+            verdict = t_sa["group_verdict_normal"] if is_normal else t_sa["group_verdict_non_normal"]
+            sign = t_sa["sign_gt"] if is_normal else t_sa["sign_le"]
+            msg = verdict.format(i=i, name=col_name) + "  \n" + t_sa["p_line"].format(p=p_value, sign=sign, alpha=alpha)
+            with cols[(i - 1) % 4]:
+                st.success(msg) if is_normal else st.error(msg)
 
         if len(result.get("shapiro_p", [])) == 0:
-            st.warning("Тест Шапиро–Уилка не рассчитан (нет данных?).")
+            st.warning(t_sa["levene_na"])
 
-        # 2b. Левен
-        st.markdown("**b. Тест Левена (однородность дисперсий)**")
+        st.markdown("**" + t_sa["levene_title"] + "**")
         levene_p = result.get("levene_p", None)
         if levene_p is None:
-            st.info("Тест Левена не применим или не рассчитан для данного набора.")
+            st.info(t_sa["levene_na"])
         else:
-            lev_text_ok = f"Дисперсии однородны  \n(p = {levene_p:.4f} > α={alpha})"
-            lev_text_bad = f"Дисперсии неоднородны  \n(p = {levene_p:.4f} ≤ α={alpha})"
-            if levene_p > alpha:
-                st.success(lev_text_ok)
-            else:
-                st.warning(lev_text_bad)
+            is_homo = levene_p > alpha
+            sign = t_sa["sign_gt"] if is_homo else t_sa["sign_le"]
+            lev_text = (t_sa["dist_homo"] if is_homo else t_sa["dist_hetero"]) + "  \n" + t_sa["p_line"].format(p=levene_p, sign=sign, alpha=alpha)
+            st.success(lev_text) if is_homo else st.warning(lev_text)
 
-        with st.expander("Помощь в интерпретации результатов"):
-            st.write(
-                "- **Шапиро–Уилка**: p > α → распределение близко к нормальному; p ≤ α → отклонение от нормальности.\n"
-                "- **Левен**: p > α → дисперсии однородны; p ≤ α → дисперсии неоднородны.\n"
-                "- Выбор параметрического/непараметрического теста и учёт однородности дисперсий зависят от этих проверок."
-            )
+        with st.expander(t_sa["help_norm_title"]):
+            st.write(t_sa["help_norm_text"])
         st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("---")
 
-        # =========================
-        # 3) Выбранный статистический метод и итог
-        # =========================
+        # ===== 3) Metoda i wniosek / Method & conclusion / Метод и итог =====
         st.markdown('<div class="report-block">', unsafe_allow_html=True)
-        st.subheader("3) Выбранный статистический метод и итог")
+        st.subheader(t_sa["sec3"])
 
         c1, c2 = st.columns(2)
         with c1:
-            st.info(f"**Использованный тест:** {result['test_used']}  \n**Уровень значимости:** α = {result['alpha']}")
+            st.info(t_sa["used_test"].format(test=result["test_used"]) + "  \n" + t_sa["alpha_used"].format(alpha=result["alpha"]))
         with c2:
-            st.info(f"**Значение статистики:** {result['statistic']:.4f}  \n**p-value:** {result['p_value']:.4f}")
+            st.info(t_sa["stat_value"].format(stat=result["statistic"]) + "  \n" + t_sa["p_value"].format(p=result["p_value"]))
 
-        st.markdown("**Краткий вывод о статистических различиях:**")
+        st.markdown(t_sa["short_conclusion"])
         if result["p_value"] < alpha:
-            st.success(
-                "Обнаружены статистически значимые различия  \n"
-                f"(p = {result['p_value']:.4f} < α={alpha})."
-            )
+            st.success(t_sa["sig_yes"] + "  \n" + t_sa["p_line"].format(p=result["p_value"], sign=t_sa["sign_gt"], alpha=alpha))
         else:
-            st.info(
-                "Статистически значимых различий не выявлено  \n"
-                f"(p = {result['p_value']:.4f} ≥ α={alpha})."
-            )
+            st.info(t_sa["sig_no"] + "  \n" + t_sa["p_line"].format(p=result["p_value"], sign=t_sa["sign_le"], alpha=alpha))
 
-        with st.expander("Помощь в интерпретации выбранного метода"):
-            st.write(
-                "- **Если p-value < α** → различия **статистически значимы** (H₀ отвергается).\n"
-                "- **Если p-value ≥ α** → статистически значимых различий **не выявлено** (оснований отвергать H₀ нет).\n"
-                "- **Что означает тест:**\n"
-                "  - **t-тест (параметрический)**: сравнивает средние при нормальности и равенстве дисперсий.\n"
-                "  - **Манна–Уитни / Уилкоксона (непараметрический)**: сравнивает распределения/медианы при нарушении нормальности.\n"
-                "  - **ANOVA**: проверяет различия между более чем двумя средними.\n"
-                "  - **Краскела–Уоллиса**: непараметрический аналог ANOVA для ненормальных выборок.\n"
-            )
+        with st.expander(t_sa["help_method_title"]):
+            st.write(t_sa["help_method_text"])
         st.markdown("</div>", unsafe_allow_html=True)
 
     except ValueError as e:
+        # Bezpiecznie: jeśli gdzieś brakuje klucza tłumaczeń — pokaż błąd oryginalnie.
         st.error(str(e))

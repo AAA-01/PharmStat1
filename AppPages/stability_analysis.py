@@ -7,7 +7,7 @@ from scipy.stats import linregress
 from utils.translations import translations
 
 def show(language):
-    t = translations[language]["stability_regression"]
+    2
 
     st.header(t["title"])
 

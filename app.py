@@ -1,74 +1,78 @@
+# app.py
 import streamlit as st
-from utils.translations import translations
+from utils.i18n import map_display_to_code, load_all, load_section
 
-# Konfiguracja strony
 st.set_page_config(page_title="Santo Pharmstat", layout="wide")
 
-# Wybór języka
-language = st.sidebar.selectbox(
+# Выбор языка (человекочитаемый)
+language_display = st.sidebar.selectbox(
     "Wybierz język / Select Language / Выберите язык",
     options=["Polski", "English", "Русский"],
-    index=0  # Ustawienie domyślnego języka (0 = Polski, 1 = English, 2 = Русский)
+    index=0
 )
+lang_code = map_display_to_code(language_display)  # "pl" | "en" | "ru"
 
-# Ustawienie tłumaczeń na podstawie wybranego języka
-t = translations[language]
+# Загружаем ВСЕ переводы или только нужные секции
+t = load_all(lang_code)
+t_general = t["general"]
+t_sa = t["statistical_analysis"]  # можно было бы load_section(lang_code, "statistical_analysis")
 
-# Menu boczne
-st.sidebar.title(t["general"]["menu_title"])
+# Меню
+st.sidebar.title(t_general["menu_title"])
 page = st.sidebar.radio(
-    t["general"]["choose_page"],
+    t_general["choose_page"],
     [
-        t["general"]["intro"],
-        t["descriptive_statistics"]["descriptive_stats"],
-        #t["histogram_analysis"]["histograms"],
-        #t["boxplot_charts"]["boxplot"],
-        t["control_charts"]["control_charts"],
-        t["process_capability"]["process_capability"],
-        t["stability_regression"]["stability_regression"],
-        "Статистический анализ",
-        #t["temp_humidity_analysis"]["temp_humidity"],
-        #t["pqr_module"]["title"]  
+        t_general["intro"],
+        t_general["descriptive_stats"],
+        t_general["control_charts"],
+        t_general["process_capability"],
+        t_general["stability_regression"],
+        t_sa["title"],  # локализованный пункт статистического анализа
     ]
 )
 
-# Routing podstron
-if page == t["general"]["intro"]:
+# Routing
+if page == t_general["intro"]:
     from AppPages import Wprowadzenie
-    Wprowadzenie.show(language)
+    Wprowadzenie.show(language_display)
 
-elif page == t["descriptive_statistics"]["descriptive_stats"]:
-    from AppPages import descriptive_statistics
-    descriptive_statistics.show(language)
-
-elif page == t["histogram_analysis"]["histograms"]:
-    from AppPages import histogram_analysis
-    histogram_analysis.show(language)
-
-elif page == t["boxplot_charts"]["boxplot"]:
-    from AppPages import BoxPlot
-    BoxPlot.show(language)
-
-elif page == t["control_charts"]["control_charts"]:
-    from AppPages import control_charts
-    control_charts.show(language)
-
-elif page == t["process_capability"]["process_capability"]:
-    from AppPages import process_capability
-    process_capability.show(language)
-
-elif page == t["stability_regression"]["stability_regression"]:
-    from AppPages import stability_analysis
-    stability_analysis.show(language)
-
-elif page == "Статистический анализ":
+elif page == t_general["statistical_analysis"]:
     from AppPages import statistical_analysis
-    statistical_analysis.show(language)
+    statistical_analysis.show(language_display)
 
-elif page == t["temp_humidity_analysis"]["temp_humidity"]:
-    from AppPages import Analiza_temperatury_wilgotnosci
-    Analiza_temperatury_wilgotnosci.show(language)
+elif page == t_general["histogram_analysis"]:
+    from AppPages import histogram_analysis
+    histogram_analysis.show(language_display)
 
-elif page == t["pqr_module"]["title"]:  
+elif page == t_general["boxplot_charts"]:
+    from AppPages import BoxPlot
+    BoxPlot.show(language_display)
+
+elif page == t_general["descriptive_statistics"]:
+    from AppPages import descriptive_statistics
+    descriptive_statistics.show(language_display)
+
+elif page == t_general["control_charts"]:
+    from AppPages import control_charts
+    control_charts.show(language_display)
+
+elif page == t_general["process_capability"]:
+    from AppPages import process_capability
+    process_capability.show(language_display)
+
+elif page == t_general["stability_regression"]:
+    from AppPages import stability_analysis
+    stability_analysis.show(language_display)
+
+elif page == t_general["pqr_module"]:  
     from AppPages import pqr
-    pqr.show(language)
+    pqr.show(language_display)
+
+elif page == t_general["temp_humidity_analysis"]:
+    from AppPages import Analiza_temperatury_wilgotnosci
+    Analiza_temperatury_wilgotnosci.show(language_display)
+
+elif page == t_sa["title"]:
+    from AppPages import statistical_analysis
+    statistical_analysis.show(language_display)
+
