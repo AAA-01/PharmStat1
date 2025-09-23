@@ -13,10 +13,10 @@ def show(language):
     st.header(t["title"])
 
     st.write(f"""
-    **{t["instructions"]["header"]}:**
-    - {t["instructions"]["upload_file"]}
-    - {t["instructions"]["set_spec_limits"]}
-    - {t["instructions"]["view_results"]}
+    **{t['instructions']['header']}:**
+    - {t['instructions']['upload_file']}
+    - {t['instructions']['set_spec_limits']}
+    - {t['instructions']['view_results']}
     """)
 
     uploaded_file = st.file_uploader(t["file_handling"]["choose_file"], type=["xlsx", "xls"])
@@ -36,9 +36,6 @@ def show(language):
                 st.dataframe(data.head(10))
 
             st.subheader(t["spec_settings"]["target"])
-            #target = st.number_input(t["spec_settings"]["target"], value=float(data.mean()))
-            #LSL = st.number_input(t["spec_settings"]["lsl"], value=float(data.min()))
-            #USL = st.number_input(t["spec_settings"]["usl"], value=float(data.max()))
             target = st.number_input(t["spec_settings"]["target"], value=0.0, format="%0.2f")
             LSL = st.number_input(t["spec_settings"]["lsl"], value=0.0, format="%0.2f")
             USL = st.number_input(t["spec_settings"]["usl"], value=0.0, format="%0.2f")
@@ -75,21 +72,21 @@ def show(language):
 
             st.subheader(t["results"]["header"])
 
-            st.write(f"**{t["results"]["cp"]}:** {round(Cp, 2)}")
-            st.write(f"**{t["results"]["cpk"]}:** {round(Cpk, 2)}")
+            st.write(f"**{t['results']['cp']}:** {round(Cp, 2)}")
+            st.write(f"**{t['results']['cpk']}:** {round(Cpk, 2)}")
 
             st.write("---")
-            st.write(f"**{t["results"]["sample_size"]}:** {num_samples}")
-            st.write(f"**{t["results"]["sample_mean"]}:** {round(sample_mean, 2)}")
-            st.write(f"**{t["results"]["sample_std"]}:** {round(sample_std, 2)}")
-            st.write(f"**{t["results"]["sample_max"]}:** {sample_max}")
-            st.write(f"**{t["results"]["sample_min"]}:** {sample_min}")
-            st.write(f"**{t["results"]["sample_median"]}:** {sample_median}")
+            st.write(f"**{t['results']['sample_size']}:** {num_samples}")
+            st.write(f"**{t['results']['sample_mean']}:** {round(sample_mean, 2)}")
+            st.write(f"**{t['results']['sample_std']}:** {round(sample_std, 2)}")
+            st.write(f"**{t['results']['sample_max']}:** {sample_max}")
+            st.write(f"**{t['results']['sample_min']}:** {sample_min}")
+            st.write(f"**{t['results']['sample_median']}:** {sample_median}")
 
-            st.write(f"**{t["results"]["pct_below_lsl"]}:** {round(pct_below_LSL, 2)}%")
-            st.write(f"**{t["results"]["pct_above_usl"]}:** {round(pct_above_USL, 2)}%")
+            st.write(f"**{t['results']['pct_below_lsl']}:** {round(pct_below_LSL, 2)}%")
+            st.write(f"**{t['results']['pct_above_usl']}:** {round(pct_above_USL, 2)}%")
 
         except Exception as e:
-            st.error(f"{t["file_handling"]["error_processing_file"]}: {e}")
+            st.error(f"{t['file_handling']['error_processing_file']}: {e}")
     else:
         st.info(t["file_handling"]["no_file_uploaded"])
