@@ -17,7 +17,7 @@ SECTIONS: List[str] = [
     # "descriptive_statistics",
     # "control_charts",
     # "process_capability",
-    # "stability_regression",
+    "stability_regression",
     # "histogram_analysis",
     # "boxplot_charts",
     # "temp_humidity_analysis",
