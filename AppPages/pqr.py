@@ -5,49 +5,83 @@ import numpy as np
 from scipy.stats import norm
 from SPC import ImRControlChart, Rule01, Rule02, Rule03, Rule04, Rule05, Rule06, Rule07, Rule08
 from utils.translations import translations
+from streamlit_quill import st_quill
 
 def show(language):
-    t = translations[language]["pqr_module"]
+    with st.expander("Загрузить файл"):
+        t = translations[language]["pqr_module"]
 
-    st.header(t["title"])
+        st.header(t["title"])
 
-    st.write(f"""
-    **{t["instructions"]["header"]}:**
-    - {t["instructions"]["upload_file"]}
-    - {t["instructions"]["select_series"]}
-    - {t["instructions"]["input_spec_limits"]}
-    - {t["instructions"]["view_charts"]}
-    """)
+        st.write(f"""
+        **{t["instructions"]["header"]}:**
+        - {t["instructions"]["upload_file"]}
+        - {t["instructions"]["select_series"]}
+        - {t["instructions"]["input_spec_limits"]}
+        - {t["instructions"]["view_charts"]}
+        """)
 
-    uploaded_file = st.file_uploader(t["file_handling"]["choose_file"], type=["xlsx", "xls"])
+        uploaded_file = st.file_uploader(t["file_handling"]["choose_file"], type=["xlsx", "xls"])
 
     if uploaded_file is not None:
         try:
-            df = pd.read_excel(uploaded_file)
+            with st.expander("Название PQR"):
+                df = pd.read_excel(uploaded_file)
 
-            col_count = df.shape[1]
-            if col_count < 2:
-                st.error(t["file_handling"]["error_two_columns"])
-                return
+                col_count = df.shape[1]
+                if col_count < 2:
+                    st.error(t["file_handling"]["error_two_columns"])
+                    return
 
-            df.rename(columns={df.columns[0]: t["chart_labels"]["time_series"]}, inplace=True)
+                # Переименовали первый столбец в "Id serii" / "Time" и т.п.
+                df.rename(columns={df.columns[0]: t["chart_labels"]["time_series"]}, inplace=True)
 
-            if col_count > 2:
-                result_column = st.selectbox(
-                    t["file_handling"]["select_result_column"],
-                    df.columns[1:],
-                    help=t["file_handling"]["select_result_column_help"]
+                # Выбор столбца с результатами
+                if col_count > 2:
+                    result_column = st.selectbox(
+                        t["file_handling"]["select_result_column"],
+                        df.columns[1:],
+                        help=t["file_handling"]["select_result_column_help"]
+                    )
+                else:
+                    result_column = df.columns[1]
+
+                df[t["chart_labels"]["values"]] = df[result_column]
+            
+            
+            # ====== РЕДАКТОРЫ ТЕКСТА ======
+                st.header("Редактор текста")
+
+                content = st_quill(
+                    placeholder="Введите текст...",
+                    html=True,
+                    key="editor",
                 )
-            else:
-                result_column = df.columns[1]
 
-            df[t["chart_labels"]["values"]] = df[result_column]
-
+                
+          
+            
+            if content:
+                st.markdown(content, unsafe_allow_html=True)
+            # ====== ПРЕДПРОСМОТР ДАННЫХ ======
             show_data = st.checkbox(t["file_handling"]["show_data_preview"], value=True)
+
             if show_data:
                 st.subheader(t["file_handling"]["data_preview"])
-                st.dataframe(df[[t["chart_labels"]["time_series"], t["chart_labels"]["values"]]].head(10))
 
+                subset = df[[t["chart_labels"]["time_series"], t["chart_labels"]["values"]]].reset_index(drop=True)
+
+                styled_df = subset.style.set_table_styles([
+                    {'selector': 'th', 'props': [('text-align', 'left'), ('padding', '4px')]},
+                    {'selector': 'td', 'props': [('text-align', 'left'), ('padding', '4px')]}
+                ])
+
+
+                st.markdown(styled_df.to_html(), unsafe_allow_html=True)
+
+            # ====== /ПРЕДПРОСМОТР ======
+
+            # Подготовка данных для расчётов и графиков
             df[t["chart_labels"]["time_series"]] = df[t["chart_labels"]["time_series"]].astype(str)
             df[t["chart_labels"]["values"]] = pd.to_numeric(df[t["chart_labels"]["values"]], errors='coerce')
             df.dropna(subset=[t["chart_labels"]["values"]], inplace=True)
@@ -122,7 +156,11 @@ def show(language):
             plt.grid(True)
             ax.legend()
             st.pyplot(fig)
-
+            text = st.text_area(
+                label="Выводы:",
+                placeholder="Начните писать здесь...",
+                height=None  # высота растягивается автоматически
+            )
         except Exception as e:
             st.error(f"{t['file_handling']['error_processing_file']}: {e}")
     else:
